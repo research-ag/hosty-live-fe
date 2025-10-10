@@ -1,6 +1,5 @@
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
-import { useToast } from '../../hooks/useToast'
 import { Server } from 'lucide-react'
 
 interface CreateCanisterModalProps {
@@ -18,8 +17,6 @@ export function CreateCanisterModal({
   isLoading = false, 
   error 
 }: CreateCanisterModalProps) {
-
-  const { toast } = useToast()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

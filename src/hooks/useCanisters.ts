@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { canistersApi } from '../services/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { canistersApi, CreateCanisterResponse } from '../services/api'
 import type { ApiCanister } from '../types'
+import { createCanisterOnLedger } from "./useTCycles.ts";
 
 // Transform API canister to frontend format
 function transformApiCanisterToFrontend(apiCanister: ApiCanister) {
@@ -49,7 +49,7 @@ export function useCanisters() {
     queryFn: async () => {
       console.log('🚀 [useCanisters.queryFn] Starting fetch...')
       const response = await canistersApi.listCanisters()
-      
+
       console.log('📦 [useCanisters.queryFn] API response:', {
         success: response.success,
         error: response.error,
@@ -60,7 +60,7 @@ export function useCanisters() {
           canistersLength: response.data.canisters?.length,
         } : 'no data'
       })
-      
+
       if (response.success && response.data?.canisters && Array.isArray(response.data.canisters)) {
         console.log('✅ [useCanisters.queryFn] Transforming canisters...')
         const transformedCanisters = response.data.canisters.map(transformCanister)
@@ -77,9 +77,13 @@ export function useCanisters() {
 
   // Mutation for creating canisters
   const createCanisterMutation = useMutation({
-    mutationFn: canistersApi.createCanister,
+    mutationFn: async () => {
+      const { canisterId } = await createCanisterOnLedger()
+      const registrationResult = await canistersApi.registerCanister(canisterId)
+      return [canisterId, registrationResult] as [string, CreateCanisterResponse]
+    },
     onSuccess: (response) => {
-      if (response.success) {
+      if (response[1].success) {
         // Invalidate and refetch canisters list
         queryClient.invalidateQueries({ queryKey: ['canisters'] })
         // Also invalidate cycles data as creating a canister consumes cycles
@@ -96,12 +100,12 @@ export function useCanisters() {
       if (!canister) {
         throw new Error('Canister not found')
       }
-      
+
       const response = await canistersApi.deleteCanister(canister.icCanisterId)
       if (!response.success) {
         throw new Error(response.error || 'Failed to delete canister')
       }
-      
+
       return { canisterDbId, response }
     },
     onSuccess: ({ canisterDbId }) => {
@@ -116,38 +120,42 @@ export function useCanisters() {
   })
 
   // Get single canister with caching
-  const getCanister = async (icCanisterId: string, skipCache?: boolean): Promise<{ success: boolean; error?: string; data?: any }> => {
+  const getCanister = async (icCanisterId: string, skipCache?: boolean): Promise<{
+    success: boolean;
+    error?: string;
+    data?: any
+  }> => {
     try {
       console.log('🔍 [useCanisters.getCanister] Getting canister by IC ID:', icCanisterId)
-      
+
       // Try to get from cache first
       const cachedCanister = canisters?.find(c => c.icCanisterId === icCanisterId)
       if (!skipCache && cachedCanister) {
         console.log('💾 [useCanisters.getCanister] Found in cache:', cachedCanister)
         return { success: true, data: cachedCanister }
       }
-      
+
       // If not in cache, fetch from API
       const response = await canistersApi.getCanister(icCanisterId)
-      
+
       console.log('📦 [useCanisters.getCanister] API response:', response)
-      
+
       if (response.success && response.data) {
         // Transform the single canister data
         const transformedCanister = transformApiCanisterToFrontend(response.data)
         console.log('✅ [useCanisters.getCanister] Transformed canister:', transformedCanister)
-        
+
         // Update cache with the new data
         queryClient.setQueryData(['canister', icCanisterId], transformedCanister)
-        
+
         return { success: true, data: transformedCanister }
       } else {
         return { success: false, error: response.error || 'Canister not found' }
       }
     } catch (err) {
       console.error('Failed to get canister:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to get canister'
       }
     }
@@ -156,11 +164,11 @@ export function useCanisters() {
   // Wrapper functions to maintain the same interface
   const createCanister = async (): Promise<{ success: boolean; error?: string; data?: any }> => {
     try {
-      const result = await createCanisterMutation.mutateAsync()
-      return { success: result.success, error: result.error, data: result.data }
+      const [canisterId, result] = await createCanisterMutation.mutateAsync()
+      return { success: result.success, error: result.error, data: result.success ? result.data : { canisterId } }
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to create canister'
       }
     }
@@ -171,34 +179,37 @@ export function useCanisters() {
       await deleteCanisterMutation.mutateAsync(canisterDbId)
       return { success: true }
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to delete canister'
       }
     }
   }
 
   // Add controller to canister
-  const addController = async (canisterDbId: string, userPrincipal: string): Promise<{ success: boolean; error?: string }> => {
+  const addController = async (canisterDbId: string, userPrincipal: string): Promise<{
+    success: boolean;
+    error?: string
+  }> => {
     try {
       // Find the IC canister ID from the database ID
       const canister = canisters.find(c => c.id === canisterDbId)
       if (!canister) {
         throw new Error('Canister not found')
       }
-      
+
       const response = await canistersApi.addController(canister.icCanisterId, userPrincipal)
       if (!response.success) {
         throw new Error(response.error || 'Failed to add controller')
       }
-      
+
       // Invalidate all canister-related cache after adding controller
       queryClient.invalidateQueries({ queryKey: ['canisters'] })
-      
+
       return { success: true }
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to add controller'
       }
     }

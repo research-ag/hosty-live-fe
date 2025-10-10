@@ -418,7 +418,7 @@ export function CanisterPage() {
                       className="text-xs font-mono bg-muted px-2 py-1 rounded"
                     >
                       {controller ===
-                        "i2qrn-wou4z-zo3z2-g6vlg-dma7w-siosb-tfkdt-gw2ut-s2tmr-66dzg-fae" && (
+                        import.meta.env.VITE_BACKEND_PRINCIPAL && (
                         <span className="text-primary">(hosty.live) </span>
                       )}
                       {controller}

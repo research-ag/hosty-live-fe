@@ -355,16 +355,10 @@ export function CanistersPage() {
               </Button>
             </TooltipWrapper>
           )}
-
-          {/* Create Canister Button (Disabled) */}
-          <TooltipWrapper content="Canister creation is being redesigned. Users will soon create canisters directly with their IC wallet.">
-            <div>
-              <Button disabled className="flex-1 sm:flex-initial">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Canister
-              </Button>
-            </div>
-          </TooltipWrapper>
+          <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Canister
+          </Button>
         </div>
       </div>
 

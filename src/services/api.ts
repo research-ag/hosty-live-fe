@@ -43,12 +43,12 @@ export function clearAuthTokens() {
 async function getAuthHeaders() {
   console.log('🔐 [getAuthHeaders] Getting access token...')
   const accessToken = getStoredAccessToken()
-  
+
   console.log('🔐 [getAuthHeaders] Token check:', {
     hasAccessToken: !!accessToken,
     tokenPreview: accessToken ? `${accessToken.substring(0, 20)}...` : 'none',
   })
-  
+
   if (!accessToken) {
     console.error('❌ [getAuthHeaders] No access token')
     throw new Error('No active session')
@@ -58,7 +58,7 @@ async function getAuthHeaders() {
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
   }
-  
+
   console.log('✅ [getAuthHeaders] Headers prepared')
   return headers
 }
@@ -77,7 +77,7 @@ export const authApi = {
   async authWithII(principal: string) {
     try {
       console.log('🔐 [authApi.authWithII] Authenticating with principal:', principal)
-      
+
       const response = await fetch(`${API_BASE}/auth-ii`, {
         method: 'POST',
         headers: {
@@ -96,17 +96,17 @@ export const authApi = {
 
       const data = await response.json()
       console.log('✅ [authApi.authWithII] Success response:', data)
-      
+
       // Store tokens
       if (data.success && data.accessToken && data.refreshToken) {
         setAuthTokens(data.accessToken, data.refreshToken, principal)
       }
-      
+
       return data
     } catch (err) {
       console.error('💥 [authApi.authWithII] Exception:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Authentication failed'
       }
     }
@@ -119,7 +119,7 @@ export const profileApi = {
   async getProfile() {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/profile`, {
         method: 'GET',
         headers,
@@ -135,8 +135,8 @@ export const profileApi = {
       const data = await response.json()
       return { success: true, data }
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to get profile'
       }
     }
@@ -149,7 +149,7 @@ export const freeCanisterApi = {
   async claimFreeCanister() {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-claim-free`, {
         method: 'POST',
         headers,
@@ -165,13 +165,23 @@ export const freeCanisterApi = {
       const data = await response.json()
       return data
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to claim free canister'
       }
     }
   }
 }
+
+export interface CreateCanisterResponse {
+  success: boolean;
+  data?: {
+    canisterNumber: number;
+    canisterId: string;
+    frontendUrl: string;
+  };
+  error?: string;
+};
 
 // Canisters API
 export const canistersApi = {
@@ -179,16 +189,16 @@ export const canistersApi = {
   async listCanisters() {
     try {
       console.log('🔍 [canistersApi.listCanisters] Starting API call...')
-      
+
       const headers = await getAuthHeaders()
       console.log('🔑 [canistersApi.listCanisters] Headers:', {
         ...headers,
         Authorization: headers.Authorization ? `Bearer ${headers.Authorization.substring(7, 20)}...` : 'missing'
       })
-      
+
       const url = `${API_BASE}/canisters-list`
       console.log('🌐 [canistersApi.listCanisters] URL:', url)
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers,
@@ -213,25 +223,26 @@ export const canistersApi = {
         totalCount: data.data?.totalCount,
         fullResponse: data
       })
-      
+
       return data // Return the edge function response directly (already has success/data structure)
     } catch (err) {
       console.error('💥 [canistersApi.listCanisters] Exception:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to fetch canisters'
       }
     }
   },
 
-  // Create a new canister
-  async createCanister() {
+  // Register a newly created canister in backend
+  async registerCanister(canisterId: string): Promise<CreateCanisterResponse> {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-create`, {
         method: 'POST',
         headers,
+        body: JSON.stringify({ canisterId }),
       })
 
       checkUnauthorized(response)
@@ -242,10 +253,10 @@ export const canistersApi = {
       }
 
       const data = await response.json()
-      return data // Return the edge function response directly
+      return data as CreateCanisterResponse
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to create canister'
       }
     }
@@ -255,9 +266,9 @@ export const canistersApi = {
   async getCanister(icCanisterId: string) {
     try {
       console.log('🔍 [canistersApi.getCanister] Starting API call for IC canister:', icCanisterId)
-      
+
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-get?canisterId=${encodeURIComponent(icCanisterId)}`, {
         method: 'GET',
         headers,
@@ -278,8 +289,8 @@ export const canistersApi = {
       return data // Return the edge function response directly
     } catch (err) {
       console.error('💥 [canistersApi.getCanister] Exception:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to get canister'
       }
     }
@@ -289,7 +300,7 @@ export const canistersApi = {
   async deleteCanister(canisterId: string) {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-delete`, {
         method: 'DELETE',
         headers,
@@ -306,8 +317,8 @@ export const canistersApi = {
       const data = await response.json()
       return data // Return the edge function response directly
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to delete canister'
       }
     }
@@ -317,7 +328,7 @@ export const canistersApi = {
   async addController(canisterId: string, userPrincipal: string) {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-add-controller`, {
         method: 'POST',
         headers,
@@ -334,8 +345,8 @@ export const canistersApi = {
       const data = await response.json()
       return data // Return the edge function response directly
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to add controller'
       }
     }
@@ -348,7 +359,7 @@ export const customDomainApi = {
   async addDomain(canisterId: string, domain: string, skipUpload: boolean) {
     try {
       const headers = await getAuthHeaders()
-      
+
       const response = await fetch(`${API_BASE}/canister-add-domain`, {
         method: 'POST',
         headers,
@@ -365,8 +376,8 @@ export const customDomainApi = {
       const data = await response.json()
       return data // Return the edge function response directly
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to add domain'
       }
     }
@@ -376,7 +387,7 @@ export const customDomainApi = {
   async getCurrentDomain(canisterId: string) {
     try {
       const response = await fetch(`https://${canisterId}.icp0.io/.well-known/ic-domains`)
-      
+
       if (!response.ok) {
         return null
       }
@@ -392,7 +403,7 @@ export const customDomainApi = {
   async checkRegistrationStatus(requestId: string) {
     try {
       const response = await fetch(`https://icp0.io/registrations/${requestId}`)
-      
+
       if (!response.ok) {
         return { success: false, error: 'Registration not found' }
       }
@@ -400,8 +411,8 @@ export const customDomainApi = {
       const data = await response.json()
       return { success: true, data }
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to check status'
       }
     }
@@ -414,14 +425,14 @@ export const deploymentsApi = {
   async listDeployments(limit = 50, offset = 0) {
     try {
       console.log('🔍 [deploymentsApi.listDeployments] Starting API call...')
-      
+
       const headers = await getAuthHeaders()
-      
+
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: offset.toString()
       })
-      
+
       const response = await fetch(`${API_BASE}/deployments-list?${params}`, {
         method: 'GET',
         headers,
@@ -442,8 +453,8 @@ export const deploymentsApi = {
       return data // Return the edge function response directly
     } catch (err) {
       console.error('💥 [deploymentsApi.listDeployments] Exception:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to fetch deployments'
       }
     }
@@ -453,13 +464,13 @@ export const deploymentsApi = {
   async getDeployment(deploymentId: string) {
     try {
       console.log('🚀 [deploymentsApi.getDeployment] Starting API call for deployment:', deploymentId)
-      
+
       const headers = await getAuthHeaders()
       console.log('🔑 [deploymentsApi.getDeployment] Headers prepared')
-      
+
       const url = `${API_BASE}/deployment-get?id=${encodeURIComponent(deploymentId)}`
       console.log('🌐 [deploymentsApi.getDeployment] URL:', url)
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers,
@@ -484,12 +495,12 @@ export const deploymentsApi = {
         deploymentId: data.data?.deployment?.id,
         fullResponse: data
       })
-      
+
       return data // Return the edge function response directly
     } catch (err) {
       console.error('💥 [deploymentsApi.getDeployment] Exception:', err)
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to get deployment'
       }
     }
@@ -504,7 +515,7 @@ export const deploymentsApi = {
   }) {
     try {
       const accessToken = getStoredAccessToken()
-      
+
       if (!accessToken) {
         throw new Error('No active session')
       }
@@ -518,7 +529,7 @@ export const deploymentsApi = {
       if (data.outputDir) {
         formData.append('outputDir', data.outputDir)
       }
-      
+
       const response = await fetch(`${API_BASE}/upload-deployment`, {
         method: 'POST',
         headers: {
@@ -537,8 +548,8 @@ export const deploymentsApi = {
       const result = await response.json()
       return result // Return the edge function response directly
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to upload deployment'
       }
     }
@@ -554,7 +565,7 @@ export const deploymentsApi = {
   }) {
     try {
       const accessToken = getStoredAccessToken()
-      
+
       if (!accessToken) {
         throw new Error('No active session')
       }
@@ -584,8 +595,8 @@ export const deploymentsApi = {
       const result = await response.json()
       return result // Return the edge function response directly
     } catch (err) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: err instanceof Error ? err.message : 'Failed to upload deployment from Git'
       }
     }
